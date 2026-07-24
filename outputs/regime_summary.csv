@@ -1,0 +1,3 @@
+state_label,observations,mean_abs_return_pct,realized_variance_pct2
+Low probability high-vol,2232,0.27479951812753217,0.1250394885399053
+High probability high-vol,364,1.1767474645668514,2.2062397123958397

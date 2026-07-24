@@ -1,0 +1,16 @@
+{
+  "retrieved_at_utc": "2026-07-24T19:40:28.860443+00:00",
+  "source": "Yahoo Finance via yfinance",
+  "tickers": {
+    "usd_idr": "IDR=X",
+    "us10y_yield": "^TNX"
+  },
+  "date_start": "2016-07-01",
+  "date_end": "2026-07-24",
+  "rows": 2618,
+  "sha256": "8a5e8a463baff306a2ba82d0c60ffdf20eea649a9aa00062ee28157d9ceabcbc",
+  "notes": [
+    "^TNX is used as a US 10-year yield proxy.",
+    "Indonesia 10-year yield is intentionally not inferred from an unverified Yahoo ticker."
+  ]
+}

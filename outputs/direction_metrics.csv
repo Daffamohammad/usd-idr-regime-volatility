@@ -1,0 +1,3 @@
+model,observations,accuracy_pct,up_prediction_share_pct,true_up_share_pct,true_negatives,false_positives,false_negatives,true_positives
+Persistence sign baseline,520,49.23076923076923,54.807692307692314,54.807692307692314,103,132,132,153
+Logistic direction model,520,54.03846153846153,49.23076923076923,54.807692307692314,130,105,134,151
