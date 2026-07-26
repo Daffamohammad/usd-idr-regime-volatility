@@ -1687,7 +1687,7 @@ wheels = [
 [[package]]
 name = "usd-idr-regime-volatility"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "arch" },
     { name = "jupyter" },
