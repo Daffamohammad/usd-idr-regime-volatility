@@ -23,6 +23,36 @@ SPECS = (
 )
 
 
+def ewma_one_step_variance_forecasts(
+    returns_pct: pd.Series, split_index: int, decay: float = 0.94
+) -> pd.Series:
+    """Forecast variance with a leakage-free RiskMetrics-style EWMA baseline.
+
+    The forecast for each test date is formed before that date's return is
+    observed.  Keeping this deliberately simple benchmark beside the GARCH
+    family shows whether extra model complexity earns its place.
+    """
+    if split_index < 2 or split_index >= len(returns_pct):
+        raise ValueError("split_index tidak valid untuk EWMA forecast.")
+    if not 0 < decay < 1:
+        raise ValueError("decay EWMA harus berada di antara 0 dan 1.")
+
+    history = returns_pct.iloc[:split_index]
+    variance = float(history.iloc[0] ** 2)
+    for observed_return in history.iloc[1:]:
+        variance = decay * variance + (1 - decay) * float(observed_return**2)
+
+    predictions: dict[pd.Timestamp, float] = {}
+    for position in range(split_index, len(returns_pct)):
+        predictions[returns_pct.index[position]] = variance
+        observed_return = float(returns_pct.iloc[position])
+        variance = decay * variance + (1 - decay) * observed_return**2
+
+    result = pd.Series(predictions, name=f"variance_EWMA(lambda={decay:.2f})")
+    result.index.name = returns_pct.index.name
+    return result
+
+
 def _make_model(returns: pd.Series, spec: GarchSpec):
     return arch_model(
         returns,
