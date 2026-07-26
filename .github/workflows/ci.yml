@@ -1,0 +1,24 @@
+name: Reproducibility checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked
+      - run: uv run pytest -q
+      - run: MPLBACKEND=Agg uv run python -m src.forecasting
+      - run: MPLBACKEND=Agg uv run python scripts/execute_notebook_inprocess.py notebooks/01_eda_and_regime_detection.ipynb
+      - run: MPLBACKEND=Agg uv run python scripts/execute_notebook_inprocess.py notebooks/02_garch_forecasting.ipynb

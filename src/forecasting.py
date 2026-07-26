@@ -15,7 +15,12 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from .feature_engineering import add_optional_macro_features, build_daily_features, chronological_split, load_market_snapshot
-from .garch_modeling import SPECS, evaluate_variance_forecasts, rolling_one_step_variance_forecasts
+from .garch_modeling import (
+    SPECS,
+    evaluate_variance_forecasts,
+    ewma_one_step_variance_forecasts,
+    rolling_one_step_variance_forecasts,
+)
 from .hamilton_regime import fit_hamilton_smoothed, fit_hamilton_train_and_filter, regime_summary
 
 
@@ -105,7 +110,8 @@ def plot_volatility_forecasts(volatility_frame: pd.DataFrame, output_path: str |
     fig, axis = plt.subplots(figsize=(13, 5.5))
     # Plot daily standard deviation rather than variance for reader clarity.
     axis.plot(volatility_frame["date"], np.sqrt(volatility_frame["realized_variance"]), color="black", alpha=0.45, linewidth=0.8, label="|return aktual| (proxy volatilitas harian)")
-    for column, color in zip([c for c in volatility_frame if c.startswith("variance_")], ["#1f77b4", "#ff7f0e", "#2ca02c"]):
+    colors = ["#6b7280", "#1f77b4", "#ff7f0e", "#2ca02c"]
+    for column, color in zip([c for c in volatility_frame if c.startswith("variance_")], colors):
         axis.plot(volatility_frame["date"], np.sqrt(volatility_frame[column]), linewidth=1.1, color=color, label=column.removeprefix("variance_"))
     axis.set(title="Forecast one-step volatilitas USD/IDR pada test set", xlabel="Tanggal", ylabel="Volatilitas harian (%)")
     axis.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
@@ -140,8 +146,10 @@ def run_experiment(
     features = features.dropna(subset=["high_vol_probability_filtered_lag_1"] + _direction_features(features)).reset_index()
     train, test = chronological_split(features)
 
-    variance_columns = {}
     full_returns = features.set_index("date")["log_return_pct"]
+    variance_columns = {
+        "variance_EWMA(lambda=0.94)": ewma_one_step_variance_forecasts(full_returns, len(train))
+    }
     for spec in SPECS:
         variance_columns[f"variance_{spec.name}"] = rolling_one_step_variance_forecasts(full_returns, len(train), spec)
     forecasts = pd.DataFrame(variance_columns)

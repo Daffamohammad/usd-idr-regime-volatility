@@ -1,117 +1,132 @@
 # USD/IDR Regime-Aware Volatility Forecasting
 
-Proyek course-project ini mengembangkan ulang forecasting USD/IDR dengan tiga pertanyaan yang sengaja dipisahkan:
+[![Reproducibility checks](https://github.com/Daffamohammad/usd-idr-regime-volatility/actions/workflows/ci.yml/badge.svg)](https://github.com/Daffamohammad/usd-idr-regime-volatility/actions/workflows/ci.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![Snapshot data](https://img.shields.io/badge/data%20snapshot-24%20Jul%202026-2E7D32)
 
-1. Kapan pasar berada pada rezim volatilitas tinggi?
-2. Seberapa baik keluarga GARCH meramalkan varians return hari berikutnya?
-3. Seberapa baik fitur historis yang tersedia saat ini mengklasifikasikan arah USD/IDR berikutnya?
+> A reproducible econometrics case study: identify endogenous USD/IDR volatility regimes, forecast next-day variance, and separate that task from directional classification.
 
-Ini adalah artefak pembelajaran dan portfolio, bukan sinyal trading, rekomendasi investasi, ataupun bukti kausal bahwa sebuah peristiwa menyebabkan perubahan kurs.
+<p align="center">
+  <img src="outputs/regime_probability.png" alt="Hamilton high-volatility regime probability for USD/IDR" width="100%" />
+</p>
 
-## Hasil eksekusi snapshot
+This portfolio project asks three deliberately separate questions:
 
-Snapshot Yahoo Finance yang tersimpan mencakup **1 Juli 2016–24 Juli 2026** (2.618 observasi harga USD/IDR; 2.597 observasi setelah pembentukan fitur). Train berakhir pada 19 Juli 2024; 520 hari observasi berikutnya menjadi test set final. Seluruh angka di bawah berasal dari eksekusi kode yang tersimpan, bukan placeholder.
+1. **When does USD/IDR enter a high-volatility regime?**
+2. **Do GARCH-family models improve next-day variance forecasts over a simple EWMA benchmark?**
+3. **How much directional accuracy is available from information known at the time?**
 
-| Tugas | Model | Hasil test set |
+It is a learning and portfolio artefact—not a trading signal, investment recommendation, or causal claim about exchange-rate events.
+
+## What I built
+
+- A frozen and checksummed USD/IDR + US 10Y market-data snapshot, so the result can be reproduced without depending on a live download.
+- A two-state Hamilton Markov-switching diagnostic that distinguishes **filtered** probabilities safe for prediction from **smoothed** probabilities used only for historical interpretation.
+- Leakage-aware rolling one-step forecasts for EWMA, GARCH, EGARCH, and GJR-GARCH with periodic refitting.
+- A separate logistic direction model with a persistence-sign baseline—because variance forecasting and return direction are different tasks.
+- Reusable Python modules, unit tests, executed artefacts, a pinned lockfile, and CI checks.
+
+## Executed result snapshot
+
+The tracked Yahoo Finance snapshot covers **1 July 2016–24 July 2026** (2,618 price observations; 2,597 after feature construction). The final chronological test set contains 520 observations, beginning 22 July 2024. These values are generated from the tracked snapshot, not placeholders.
+
+| Task | Model | Test-set result |
 | --- | --- | ---: |
-| Forecast varians | GARCH(1,1) | QLIKE **-0,0405**; MAE varians 0,8396; RMSE varians 3,0978 |
-| Forecast varians | EGARCH(1,1) | QLIKE -0,0076; MAE varians **0,7240**; RMSE varians **3,0380** |
-| Forecast varians | GJR-GARCH(1,1) | QLIKE -0,0375; MAE varians 0,8408; RMSE varians 3,1072 |
-| Arah USD/IDR | Persistence-sign baseline | 49,23% akurasi |
-| Arah USD/IDR | Logistic dengan fitur lag, volatilitas, US10Y, dan probabilitas regime terfilter | **54,04%** akurasi |
+| Variance forecast | **GARCH(1,1)** | **Best QLIKE: −0.0405** |
+| Variance forecast | EGARCH(1,1) | **Best variance MAE/RMSE: 0.7240 / 3.0380** |
+| Variance forecast | GJR-GARCH(1,1) | QLIKE −0.0375 |
+| Variance forecast | EWMA (λ = 0.94) | QLIKE 0.2342; MAE 0.8645; RMSE 3.1364 |
+| Direction | Persistence-sign baseline | 49.23% accuracy |
+| Direction | Logistic with lagged market, volatility, US10Y, and filtered-regime features | **54.04% accuracy** |
 
-Tidak ada “pemenang” tunggal pada forecasting volatilitas: GARCH memiliki QLIKE terbaik (lebih rendah lebih baik), sedangkan EGARCH memiliki MAE/RMSE varians paling rendah. Untuk arah, kenaikan terhadap baseline kecil; jangan menafsirkannya sebagai prediktabilitas ekonomi yang kuat.
+There is no single volatility winner: GARCH is preferred by QLIKE (lower is better), while EGARCH minimizes MAE/RMSE against squared return. Crucially, every GARCH-family specification outperforms the simple EWMA benchmark on all reported variance losses in this snapshot. That is evidence for this fixed sample—not a claim of universal superiority.
 
-Regime high-volatility yang diestimasi secara endogen memiliki rata-rata absolute return 1,177% dibanding 0,275% pada kondisi low-volatility probability. Itu adalah diagnostic yang konsisten dengan definisi rezim, bukan validasi kausal atas timeline peristiwa.
+The directional lift is intentionally presented cautiously. A 54.04% accuracy result on 520 observations is not sufficient to claim a durable predictive edge; it is an exploratory classification result that should be stress-tested across rolling test windows before any practical use.
 
-## Metodologi
+<p align="center">
+  <img src="outputs/volatility_forecasts.png" alt="One-step-ahead USD/IDR volatility forecasts on the final test set" width="100%" />
+</p>
 
-### 1. Data dan informasi yang tersedia
+## Methodology and information discipline
 
-- `IDR=X`: rate IDR per USD dari Yahoo Finance melalui `yfinance`.
-- `^TNX`: proksi yield US Treasury 10Y; nilai terakhir yang dipublikasikan diteruskan hanya pada hari pasar AS tutup.
-- `data/raw/manifest.json` menyimpan rentang, waktu pengambilan, ticker, dan SHA-256 snapshot.
-- [Bank Indonesia BI-Rate](https://www.bi.go.id/id/statistik/indikator/bi-rate.aspx) dan [inflasi](https://www.bi.go.id/id/statistik/indikator/data-inflasi.aspx) adalah sumber resmi yang direkomendasikan untuk ekstensi makro. Mereka belum dipakai pada hasil utama karena snapshot historis terstruktur belum dapat ditarik dengan endpoint publik yang stabil pada saat reproduksi.
+### Data
 
-Proyek tidak memakai ticker Yahoo yang tidak tervalidasi untuk yield Indonesia 10Y. Kontrak input untuk `BI-Rate`, inflasi YoY, dan `ID10Y` tersedia di [data/raw/README.md](data/raw/README.md); jika ketiganya disediakan, penyelarasan dilakukan **as-of backward** berdasarkan tanggal ketika data telah diketahui pasar.
+- `IDR=X`: IDR per USD from Yahoo Finance via `yfinance`.
+- `^TNX`: US Treasury 10Y yield proxy. The last published value is carried forward only across dates where the US market is closed.
+- [`data/raw/manifest.json`](data/raw/manifest.json) records ticker, retrieval time, coverage, and SHA-256 checksum.
+- Optional Bank Indonesia Rate, inflation, and Indonesia 10Y yield inputs follow the documented [`available_date` / as-of rule](data/raw/README.md); no unverified ticker is substituted.
 
-### 2. Hamilton (1989) Markov switching
+### Regime detection
 
-`statsmodels.tsa.regime_switching.MarkovRegression` diestimasi pada log return harian (%) dengan dua state, intercept yang dapat berbeda, dan `switching_variance=True`.
+`statsmodels.tsa.regime_switching.MarkovRegression` is fitted to daily log returns (%) with two states, state-specific intercepts, and `switching_variance=True`.
 
-Untuk menjaga notebook dapat dijalankan ulang dalam waktu wajar, optimisasi memakai tiga inisialisasi acak dengan seed 42 dan lima iterasi EM awal. Ini adalah trade-off reproducibility/runtime, bukan pencarian global yang sempurna.
+- High-volatility is labelled by the state with higher realised variance—not by its arbitrary model number.
+- **Smoothed** probabilities use future observations and are restricted to retrospective charts.
+- The direction model uses a **train-fitted filtered** probability, lagged one day, so the target-day return cannot leak into a predictor.
+- Event annotations are plausibility context only; they are not causal evidence or model targets.
 
-- Label high-vol bukan nomor regime bawaan; ia dipilih dari realized variance state yang lebih tinggi.
-- Grafik overlay peristiwa memakai probabilitas **smoothed** untuk pembacaan retrospektif saja.
-- Model arah menggunakan probabilitas **filtered** yang diestimasi dengan parameter dari train set dan kemudian dilag satu hari. Ini mencegah future return masuk sebagai fitur.
+### Variance forecasting
 
-Timeline perang dagang Maret 2018, pandemi Maret 2020, dan siklus kenaikan The Fed Maret 2022 hanya dipakai sebagai annotation ekonomi—bukan label target atau bukti validitas model.
+All variance models use daily returns in percent and are evaluated one step ahead against squared return, a noisy realised-variance proxy:
 
-### 3. GARCH-family dan evaluasi
+- EWMA / RiskMetrics-style baseline with λ = 0.94;
+- GARCH(1,1), EGARCH(1,1), and GJR-GARCH(1,1), each with Student-t innovations;
+- GARCH-family parameters are refit every 63 observations using only information then available;
+- MAE, RMSE, and QLIKE are reported together because each loss captures a different aspect of variance-forecast quality.
 
-Semua model menggunakan return harian dalam persen dan inovasi Student-t:
+The directional classifier is explicitly a separate task. It uses a `StandardScaler` + logistic-regression pipeline with lagged returns, volatility, US10Y changes, and the lagged filtered regime probability. Its comparator is persistence of the prior return sign.
 
-- GARCH(1,1),
-- EGARCH(1,1),
-- GJR-GARCH(1,1).
+## Reproduce exactly
 
-Forecast dilakukan one-step-ahead di test set. Parameter direfit setiap 63 observasi (sekitar satu kuartal hari bursa) menggunakan history yang sudah tersedia; di antara refit, varians diperbarui memakai return yang sudah teramati dan parameter terakhir. Target evaluasi adalah squared return hari berikutnya sebagai noisy proxy untuk realized variance. Karena itu metriknya adalah MAE/RMSE varians (%²) dan QLIKE—bukan directional accuracy.
+The canonical environment is Python 3.12 with [`pyproject.toml`](pyproject.toml) and the committed [`uv.lock`](uv.lock). Install [uv](https://docs.astral.sh/uv/) once, then run:
 
-Arah adalah tugas berbeda: baseline persistence-sign dibandingkan dengan Logistic Regression ber-pipeline `StandardScaler`, memakai hanya return/volatilitas/yield lag dan filtered regime probability yang tersedia sebelum target.
+```bash
+uv sync --locked
+uv run pytest -q
+MPLBACKEND=Agg uv run python -m src.forecasting
+MPLBACKEND=Agg uv run python scripts/execute_notebook_inprocess.py notebooks/01_eda_and_regime_detection.ipynb
+MPLBACKEND=Agg uv run python scripts/execute_notebook_inprocess.py notebooks/02_garch_forecasting.ipynb
+```
 
-## Struktur
+The standard notebook route is also available:
+
+```bash
+MPLBACKEND=Agg uv run jupyter nbconvert --execute --to notebook --inplace notebooks/01_eda_and_regime_detection.ipynb
+MPLBACKEND=Agg uv run jupyter nbconvert --execute --to notebook --inplace notebooks/02_garch_forecasting.ipynb
+```
+
+Notebook 02 reads the tracked snapshot rather than downloading data again. To reproduce the exact values in this repository, do not refresh `data/raw/yahoo_usd_idr_us10y.csv`. [`requirements.txt`](requirements.txt) remains as a simple `pip` fallback, while `uv.lock` is the reproducible source of truth. GitHub Actions runs the tests, full pipeline, and both notebooks on every pull request and push to `main`.
+
+## Repository map
 
 ```text
 data/
-  raw/          # snapshot Yahoo + manifest + kontrak data makro opsional
-  processed/    # fitur harian hasil pipeline
-notebooks/
-  01_eda_and_regime_detection.ipynb
-  02_garch_forecasting.ipynb
-src/
-  data_ingestion.py
-  feature_engineering.py
-  hamilton_regime.py
-  garch_modeling.py
-  forecasting.py
-outputs/        # CSV metrik, probabilitas regime, dan chart PNG
+  raw/          # frozen Yahoo snapshot, checksum manifest, optional-macro contract
+  processed/    # generated daily features
+notebooks/      # EDA/regime diagnosis and forecasting walkthroughs
+src/            # ingestion, features, Hamilton model, GARCH/EWMA, orchestration
+tests/          # feature-availability and loss-function tests
+outputs/        # metrics, predictions, and presentation-ready charts
+.github/        # reproducibility CI
 ```
 
-## Menjalankan ulang
-
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m src.data_ingestion --start 2016-07-01 --end 2026-07-25
-MPLBACKEND=Agg .venv/bin/python -m src.forecasting
-.venv/bin/python -m jupyter nbconvert --execute --to notebook --inplace notebooks/01_eda_and_regime_detection.ipynb
-.venv/bin/python -m jupyter nbconvert --execute --to notebook --inplace notebooks/02_garch_forecasting.ipynb
-```
-
-Notebook 02 membaca snapshot yang sudah ada; tidak mengunduh ulang data. Untuk hasil yang identik dengan repository ini, gunakan file CSV snapshot yang sudah dilacak dan jangan panggil ulang data ingestion.
-
-Jika launcher kernel Jupyter lokal tidak tersedia (misalnya sandbox desktop yang membatasi socket kernel), runner in-process yang disertakan tetap menjalankan setiap code cell secara berurutan dan menyimpan execution count:
-
-```bash
-MPLBACKEND=Agg .venv/bin/python scripts/execute_notebook_inprocess.py notebooks/01_eda_and_regime_detection.ipynb
-MPLBACKEND=Agg .venv/bin/python scripts/execute_notebook_inprocess.py notebooks/02_garch_forecasting.ipynb
-```
-
-## Artefak
+## Artefacts
 
 - [Regime probability chart](outputs/regime_probability.png)
 - [Volatility forecast chart](outputs/volatility_forecasts.png)
-- [Metrik volatilitas](outputs/volatility_metrics.csv)
-- [Metrik arah](outputs/direction_metrics.csv)
-- [Prediksi volatilitas](outputs/volatility_forecasts.csv)
-- [Probabilitas regime](outputs/regime_probabilities.csv)
+- [Variance forecast metrics](outputs/volatility_metrics.csv)
+- [Direction metrics](outputs/direction_metrics.csv)
+- [Variance forecasts](outputs/volatility_forecasts.csv)
+- [Regime probabilities](outputs/regime_probabilities.csv)
+- [EDA and regime-detection notebook](notebooks/01_eda_and_regime_detection.ipynb)
+- [Forecasting notebook](notebooks/02_garch_forecasting.ipynb)
 
-## Batasan penting
+## Limitations
 
-- Yahoo Finance adalah sumber praktis untuk course project, bukan sumber resmi kurs acuan Bank Indonesia.
-- Squared daily return adalah proxy volatilitas yang sangat berisik. Analisis lanjutan sebaiknya memakai realized volatility intraday atau horizon agregat.
-- Probabilitas smoothed memakai informasi masa depan sehingga hanya cocok untuk diagnosis historis.
-- Variabel makro berfrekuensi bulanan memiliki isu tanggal rilis; gunakan `available_date`, bukan tanggal observasi ekonomi.
-- Event overlay menunjukkan koinsidensi waktu, bukan hubungan sebab-akibat.
+- Yahoo Finance is a practical course-project source, not Bank Indonesia’s official reference rate.
+- Squared daily return is a highly noisy volatility proxy; realised intraday volatility or a longer horizon would be a stronger target.
+- Optional macro series require publication-date discipline; using the economic reference month instead would create look-ahead bias.
+- Event overlays show temporal coincidence, not causality.
+- This single frozen holdout supports transparent comparison, but not an investable forecasting claim.
 
-Referensi metode: Hamilton, J. D. (1989), “A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle”, *Econometrica*, 57(2), 357–384. Implementasi regime mengikuti dokumentasi [statsmodels MarkovRegression](https://www.statsmodels.org/stable/generated/statsmodels.tsa.regime_switching.markov_regression.MarkovRegression.html); forecasting volatilitas mengikuti dokumentasi [arch](https://arch.readthedocs.io/en/stable/univariate/forecasting.html).
+Method references: Hamilton (1989), “A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle”, *Econometrica*, 57(2), 357–384; [statsmodels MarkovRegression documentation](https://www.statsmodels.org/stable/generated/statsmodels.tsa.regime_switching.markov_regression.MarkovRegression.html); [arch forecasting documentation](https://arch.readthedocs.io/en/stable/univariate/forecasting.html).
