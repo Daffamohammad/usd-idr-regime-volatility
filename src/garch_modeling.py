@@ -65,8 +65,12 @@ def rolling_one_step_variance_forecasts(
 def qlike(realized_variance: pd.Series, forecast_variance: pd.Series) -> float:
     """QLIKE loss; lower is better, and both inputs must be strictly positive."""
     aligned = pd.concat([realized_variance, forecast_variance], axis=1).dropna()
-    actual = aligned.iloc[:, 0].clip(lower=1e-12)
-    forecast = aligned.iloc[:, 1].clip(lower=1e-12)
+    actual = aligned.iloc[:, 0]
+    forecast = aligned.iloc[:, 1]
+    if (actual <= 0).any() or (forecast <= 0).any():
+        raise ValueError("QLIKE requires strictly positive variance values.")
+    actual = actual.clip(lower=1e-12)
+    forecast = forecast.clip(lower=1e-12)
     return float((np.log(forecast) + actual / forecast).mean())
 
 

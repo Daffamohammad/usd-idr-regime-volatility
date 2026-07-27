@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from itertools import cycle
 from pathlib import Path
 
 import matplotlib.dates as mdates
@@ -17,6 +19,18 @@ from sklearn.preprocessing import StandardScaler
 from .feature_engineering import add_optional_macro_features, build_daily_features, chronological_split, load_market_snapshot
 from .garch_modeling import SPECS, evaluate_variance_forecasts, rolling_one_step_variance_forecasts
 from .hamilton_regime import fit_hamilton_smoothed, fit_hamilton_train_and_filter, regime_summary
+
+
+@dataclass
+class ExperimentResult:
+    features: pd.DataFrame
+    train: pd.DataFrame
+    test: pd.DataFrame
+    volatility_metrics: pd.DataFrame
+    direction_metrics: pd.DataFrame
+    volatility_forecasts: pd.DataFrame
+    direction_predictions: pd.DataFrame
+    regime_summary: pd.DataFrame
 
 
 sns.set_theme(style="whitegrid")
@@ -54,6 +68,8 @@ def evaluate_direction(train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.Data
     actual = test["direction_up"].to_numpy()
     rows = []
     for name, prediction in [("Persistence sign baseline", persistence), ("Logistic direction model", logistic)]:
+        cm = confusion_matrix(actual, prediction, labels=[0, 1])
+        tn, fp, fn, tp = cm.ravel()
         rows.append(
             {
                 "model": name,
@@ -61,10 +77,10 @@ def evaluate_direction(train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.Data
                 "accuracy_pct": 100 * accuracy_score(actual, prediction),
                 "up_prediction_share_pct": 100 * float(np.mean(prediction)),
                 "true_up_share_pct": 100 * float(np.mean(actual)),
-                "true_negatives": int(confusion_matrix(actual, prediction, labels=[0, 1])[0, 0]),
-                "false_positives": int(confusion_matrix(actual, prediction, labels=[0, 1])[0, 1]),
-                "false_negatives": int(confusion_matrix(actual, prediction, labels=[0, 1])[1, 0]),
-                "true_positives": int(confusion_matrix(actual, prediction, labels=[0, 1])[1, 1]),
+                "true_negatives": int(tn),
+                "false_positives": int(fp),
+                "false_negatives": int(fn),
+                "true_positives": int(tp),
             }
         )
     predictions = test[["date", "log_return_pct", "direction_up"]].copy()
@@ -76,16 +92,10 @@ def evaluate_direction(train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.Data
 
 def plot_regime_probability(regime_frame: pd.DataFrame, output_path: str | Path) -> None:
     fig, axis = plt.subplots(figsize=(13, 5.5))
-    displayed_probability = regime_frame["high_vol_probability_smoothed"].rolling(21, min_periods=1).mean()
     axis.plot(
         regime_frame["date"], regime_frame["high_vol_probability_smoothed"],
-        color="#b22222", alpha=0.16, linewidth=0.65, label="Probabilitas smoothed harian",
-    )
-    axis.plot(
-        regime_frame["date"], displayed_probability,
-        color="#b22222",
-        linewidth=1.35,
-        label="Rata-rata bergerak 21 hari dari probabilitas smoothed",
+        color="#b22222", alpha=0.85, linewidth=0.8,
+        label="Probabilitas smoothed harian (Hamilton two-sided Kalman smoother)",
     )
     for label, event_date in EVENTS.items():
         timestamp = pd.Timestamp(event_date)
@@ -105,7 +115,7 @@ def plot_volatility_forecasts(volatility_frame: pd.DataFrame, output_path: str |
     fig, axis = plt.subplots(figsize=(13, 5.5))
     # Plot daily standard deviation rather than variance for reader clarity.
     axis.plot(volatility_frame["date"], np.sqrt(volatility_frame["realized_variance"]), color="black", alpha=0.45, linewidth=0.8, label="|return aktual| (proxy volatilitas harian)")
-    for column, color in zip([c for c in volatility_frame if c.startswith("variance_")], ["#1f77b4", "#ff7f0e", "#2ca02c"]):
+    for column, color in zip([c for c in volatility_frame if c.startswith("variance_")], cycle(["#1f77b4", "#ff7f0e", "#2ca02c"])):
         axis.plot(volatility_frame["date"], np.sqrt(volatility_frame[column]), linewidth=1.1, color=color, label=column.removeprefix("variance_"))
     axis.set(title="Forecast one-step volatilitas USD/IDR pada test set", xlabel="Tanggal", ylabel="Volatilitas harian (%)")
     axis.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
@@ -120,7 +130,7 @@ def run_experiment(
     raw_path: str | Path,
     output_dir: str | Path = "outputs",
     optional_macro_dir: str | Path | None = None,
-) -> dict[str, pd.DataFrame]:
+) -> ExperimentResult:
     """Execute and persist the complete v2 experiment from a frozen raw CSV."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -163,21 +173,21 @@ def run_experiment(
     plot_regime_probability(regime_frame, output_dir / "regime_probability.png")
     plot_volatility_forecasts(volatility_frame, output_dir / "volatility_forecasts.png")
 
-    return {
-        "features": features,
-        "train": train,
-        "test": test,
-        "volatility_metrics": volatility_metrics,
-        "direction_metrics": direction_metrics,
-        "volatility_forecasts": volatility_frame,
-        "direction_predictions": direction_predictions,
-        "regime_summary": regime_table,
-    }
+    return ExperimentResult(
+        features=features,
+        train=train,
+        test=test,
+        volatility_metrics=volatility_metrics,
+        direction_metrics=direction_metrics,
+        volatility_forecasts=volatility_frame,
+        direction_predictions=direction_predictions,
+        regime_summary=regime_table,
+    )
 
 
 if __name__ == "__main__":
     result = run_experiment("data/raw/yahoo_usd_idr_us10y.csv")
     print("Volatility metrics")
-    print(result["volatility_metrics"].to_string(index=False))
+    print(result.volatility_metrics.to_string(index=False))
     print("\nDirection metrics")
-    print(result["direction_metrics"].to_string(index=False))
+    print(result.direction_metrics.to_string(index=False))
