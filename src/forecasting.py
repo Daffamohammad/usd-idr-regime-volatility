@@ -18,7 +18,12 @@ from sklearn.preprocessing import StandardScaler
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from .feature_engineering import add_optional_macro_features, build_daily_features, chronological_split, load_market_snapshot
-from .garch_modeling import SPECS, evaluate_variance_forecasts, rolling_one_step_variance_forecasts
+from .garch_modeling import (
+    SPECS,
+    evaluate_variance_forecasts,
+    ewma_one_step_variance_forecasts,
+    rolling_one_step_variance_forecasts,
+)
 from .hamilton_regime import fit_hamilton_smoothed, fit_hamilton_train_and_filter, regime_summary
 
 
@@ -159,8 +164,10 @@ def run_experiment(
     features = features.dropna(subset=["high_vol_probability_filtered_lag_1"] + _direction_features(features)).reset_index()
     train, test = chronological_split(features)
 
-    variance_columns = {}
     full_returns = features.set_index("date")["log_return_pct"]
+    variance_columns = {
+        "variance_EWMA(lambda=0.94)": ewma_one_step_variance_forecasts(full_returns, len(train))
+    }
     for spec in SPECS:
         variance_columns[f"variance_{spec.name}"] = rolling_one_step_variance_forecasts(full_returns, len(train), spec)
     forecasts = pd.DataFrame(variance_columns)
