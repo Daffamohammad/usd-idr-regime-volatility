@@ -77,9 +77,20 @@ def add_optional_macro_features(frame: pd.DataFrame, macro_dir: str | Path) -> p
 
 
 def chronological_split(frame: pd.DataFrame, test_fraction: float = 0.20) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split frame into train and test sets while preserving chronological order.
+    
+    Ensures minimum viable sizes for time-series evaluation: at least 500 training
+    observations and 150 test observations.
+    """
     if not 0 < test_fraction < 0.5:
         raise ValueError("test_fraction harus berada di antara 0 dan 0.5.")
+    
     split = int(len(frame) * (1 - test_fraction))
-    if split < 500 or len(frame) - split < 150:
+    train_size = split
+    test_size = len(frame) - split
+    
+    # Ensure minimum viable sizes for time-series evaluation
+    if train_size < 500 or test_size < 150:
         raise ValueError("Observasi train/test tidak cukup untuk evaluasi time-series.")
+    
     return frame.iloc[:split].copy(), frame.iloc[split:].copy()

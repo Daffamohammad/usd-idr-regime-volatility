@@ -51,7 +51,11 @@ def download_market_snapshot(start: str = DEFAULT_START, end: str | None = None)
     usd_idr = _download_one(USD_IDR_TICKER, start, end)
     us_10y = _download_one(US_10Y_TICKER, start, end)
     panel = usd_idr.join(us_10y, how="left").reset_index().rename(columns={"Date": "date"})
-    panel["date"] = pd.to_datetime(panel["date"]).dt.tz_localize(None)
+    panel["date"] = pd.to_datetime(panel["date"])
+    if panel["date"].dt.tz is not None:
+        panel["date"] = panel["date"].dt.tz_convert("UTC").dt.tz_localize(None)
+    else:
+        panel["date"] = panel["date"].dt.tz_localize(None)
     panel = panel.rename(columns={USD_IDR_TICKER: "usd_idr", US_10Y_TICKER: "us10y_yield"})
     return validate_market_data(panel)
 

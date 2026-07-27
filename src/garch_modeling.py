@@ -77,6 +77,10 @@ def rolling_one_step_variance_forecasts(
     """
     if split_index < 500 or split_index >= len(returns_pct):
         raise ValueError("split_index tidak valid untuk rolling forecast.")
+    
+    # Calculate test window size
+    test_size = len(returns_pct) - split_index
+    
     predictions: dict[pd.Timestamp, float] = {}
     params = None
     for position in range(split_index, len(returns_pct)):
@@ -87,16 +91,25 @@ def rolling_one_step_variance_forecasts(
         fixed = _make_model(history, spec).fix(params)
         variance = float(fixed.forecast(horizon=1, reindex=False).variance.iloc[-1, 0])
         predictions[returns_pct.index[position]] = variance
+    
     result = pd.Series(predictions, name=f"variance_{spec.name}")
     result.index.name = returns_pct.index.name
-    return result
+    # Return only the test window forecasts
+    return result.iloc[-test_size:] if test_size > 0 else result
 
 
 def qlike(realized_variance: pd.Series, forecast_variance: pd.Series) -> float:
     """QLIKE loss; lower is better, and both inputs must be strictly positive."""
     aligned = pd.concat([realized_variance, forecast_variance], axis=1).dropna()
-    actual = aligned.iloc[:, 0].clip(lower=1e-12)
-    forecast = aligned.iloc[:, 1].clip(lower=1e-12)
+    actual = aligned.iloc[:, 0]
+    forecast = aligned.iloc[:, 1]
+    
+    # Validate inputs are strictly positive
+    if (actual <= 0).any():
+        raise ValueError("realized_variance must be strictly positive")
+    if (forecast <= 0).any():
+        raise ValueError("forecast_variance must be strictly positive")
+    
     return float((np.log(forecast) + actual / forecast).mean())
 
 
