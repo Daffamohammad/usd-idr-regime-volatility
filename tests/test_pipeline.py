@@ -112,6 +112,10 @@ def test_evaluate_direction_synthetic():
     returns = np.where(up_signal, 0.5 + noise, -0.5 + noise)
     frame = pd.DataFrame({"date": dates, "usd_idr": 14_000 + np.cumsum(returns), "us10y_yield": 1.5})
     features = build_daily_features(frame)
+    
+    # Add the required regime probability column
+    features["high_vol_probability_filtered_lag_1"] = 0.5  # Neutral regime signal
+    
     features = features.dropna(subset=["return_lag_20", "rolling_vol_20"]).reset_index(drop=True)
     train, test = chronological_split(features, test_fraction=0.20)
     metrics, predictions = evaluate_direction(train, test)
