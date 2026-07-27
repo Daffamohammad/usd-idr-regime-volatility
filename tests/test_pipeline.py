@@ -61,7 +61,7 @@ def test_qlike_raises_on_zero_or_negative():
 
 
 def test_build_daily_features_minimal_rows():
-    frame = _market_frame(55)
+    frame = _market_frame(1_050)
     result = build_daily_features(frame)
     assert len(result) > 0
     assert "log_return_pct" in result.columns
@@ -69,7 +69,7 @@ def test_build_daily_features_minimal_rows():
 
 
 def test_rolling_one_step_variance_forecasts_boundary():
-    frame = _market_frame(600)
+    frame = _market_frame(1_100)
     features = build_daily_features(frame)
     returns = features.set_index("date")["log_return_pct"]
     spec = GarchSpec("GARCH(1,1)", "GARCH", 0)
@@ -80,7 +80,7 @@ def test_rolling_one_step_variance_forecasts_boundary():
 
 
 def test_fit_hamilton_smoothed_output_shape():
-    frame = _market_frame(600)
+    frame = _market_frame(1_050)
     features = build_daily_features(frame)
     returns = features.set_index("date")["log_return_pct"]
     result, smoothed, high_state = fit_hamilton_smoothed(returns)
@@ -105,10 +105,10 @@ def test_chronological_split_boundaries():
 
 
 def test_evaluate_direction_synthetic():
-    dates = pd.bdate_range("2020-01-01", periods=600)
+    dates = pd.bdate_range("2020-01-01", periods=1_050)
     np.random.seed(42)
-    noise = np.random.randn(600) * 0.5
-    up_signal = (np.arange(600) % 10) > 4
+    noise = np.random.randn(1_050) * 0.5
+    up_signal = (np.arange(1_050) % 10) > 4
     returns = np.where(up_signal, 0.5 + noise, -0.5 + noise)
     frame = pd.DataFrame({"date": dates, "usd_idr": 14_000 + np.cumsum(returns), "us10y_yield": 1.5})
     features = build_daily_features(frame)
