@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.regime_switching.markov_regression import MarkovRegression
@@ -30,7 +32,12 @@ def fit_hamilton_train_and_filter(
     )
     train_result = train_model.fit(search_reps=3, em_iter=5, disp=False)
     train_probs = train_result.smoothed_marginal_probabilities
-    high_state = int(_state_variances(train_returns, train_probs).idxmax())
+    variances = _state_variances(train_returns, train_probs)
+    high_state = int(variances.idxmax())
+    low_state = 1 - high_state
+    ratio = variances[high_state] / variances[low_state]
+    if ratio < 1.5:
+        warnings.warn(f"High/low variance ratio ({ratio:.2f}) < 1.5 — state labeling may be unstable.")
 
     full_model = MarkovRegression(all_returns, k_regimes=2, trend="c", switching_variance=True)
     filtered = full_model.filter(train_result.params).filtered_marginal_probabilities[high_state]
@@ -43,7 +50,12 @@ def fit_hamilton_smoothed(all_returns: pd.Series) -> tuple[object, pd.Series, in
     np.random.seed(42)
     model = MarkovRegression(all_returns, k_regimes=2, trend="c", switching_variance=True)
     result = model.fit(search_reps=3, em_iter=5, disp=False)
-    high_state = int(_state_variances(all_returns, result.smoothed_marginal_probabilities).idxmax())
+    variances = _state_variances(all_returns, result.smoothed_marginal_probabilities)
+    high_state = int(variances.idxmax())
+    low_state = 1 - high_state
+    ratio = variances[high_state] / variances[low_state]
+    if ratio < 1.5:
+        warnings.warn(f"High/low variance ratio ({ratio:.2f}) < 1.5 — state labeling may be unstable.")
     smoothed = result.smoothed_marginal_probabilities[high_state]
     smoothed.name = "high_vol_probability_smoothed"
     return result, smoothed, high_state
