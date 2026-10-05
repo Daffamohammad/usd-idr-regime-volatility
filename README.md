@@ -4,7 +4,7 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
 ![Snapshot data](https://img.shields.io/badge/data%20snapshot-24%20Jul%202026-2E7D32)
 
-> A reproducible econometrics case study: identify endogenous USD/IDR volatility regimes, forecast next-day variance, and separate that task from directional classification.
+> Reproducible USD/IDR research that separates volatility-regime analysis, next-day variance forecasting, and directional classification.
 
 <p align="center">
   <img src="outputs/regime_probability.png" alt="Hamilton high-volatility regime probability for USD/IDR" width="100%" />
